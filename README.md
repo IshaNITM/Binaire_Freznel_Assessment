@@ -424,7 +424,3 @@ MultiUserQueueSystem/
 GitHub:
 
 https://github.com/IshaNITM/MultiUserQueueSystem
-
-## 📄 Assessment
-
-This project was developed for the **Binaire Multi-User Queue System assessment**.
