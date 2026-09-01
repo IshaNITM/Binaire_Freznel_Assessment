@@ -8,13 +8,14 @@ class SocketService {
   _isConnected = false;
 
   connect() {
-    if (this.socket) return;
-
-    this.socket = io(import.meta.env.VITE_API_URL, {
-      transports: ["websocket", "polling"],
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-    });
+    if (!this.socket) {
+      const socketUrl = import.meta.env.VITE_API_URL || "";
+      this.socket = io(socketUrl, {
+        transports: ["websocket", "polling"],
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+      });
+    }
 
     this.socket.on("connect", () => {
       this._isConnected = true;
