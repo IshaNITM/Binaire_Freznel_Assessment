@@ -1,213 +1,430 @@
-# Binaire Multi-User Queue System (`Binaire_Freznel_Assessment`)
+#  Multi-User Queue System
 
-A robust, production-ready full-stack web application implementing a **multi-user CSV processing and priority-based server queueing system** built with Node.js, TypeScript, Express, Socket.IO, worker threads, and React.
+A full-stack multi-user CSV processing and priority-based server queueing system built with **React, Node.js, Express, Socket.IO, JavaScript, and Worker Threads**.
+
+## 🚀 Live Demo
+
+**Frontend:**
+https://multi-user-queue-system-virid.vercel.app/
+
+**Backend:**
+https://multiuserqueuesystem.onrender.com
+
+## 📌 Project Overview
+
+The Binaire Multi-User Queue System allows multiple users to upload CSV files containing integer and floating-point values.
+
+Each uploaded file is assigned either **HIGH** or **LOW** priority and added to a server-side processing queue.
+
+The system provides:
+
+* Multi-user file uploads
+* HIGH / LOW priority queue
+* FIFO ordering within priority
+* Starvation prevention using aging
+* Node.js Worker Threads for CPU-intensive processing
+* Real-time queue updates using Socket.IO
+* Processing progress tracking
+* Concurrent worker pool
+* Job status tracking
+* Error handling
+* Deadlock prevention using worker timeouts
+* Streaming CSV processing
 
 ---
 
-## 1. Project Overview
-
-The Binaire Queue System allows multiple concurrent users to upload CSV files containing integer and floating-point numeric values. Uploaded files are assigned either **HIGH** or **LOW** priority and submitted to a Node.js server queue.
-
-The server manages execution using a dedicated priority queue, dispatches jobs to a pool of background CPU worker threads (`worker_threads`), tracks real-time processing progress, guarantees starvation prevention for low-priority jobs through deterministic aging, prevents deadlocks with strict timeout and resource controls, and broadcasts live visual updates to all connected dashboards via WebSockets.
-
----
-
-## 2. Architecture
+## 🏗️ Architecture
 
 ```text
-Client (React + TS)
-   │ (HTTP POST /api/upload & WebSocket updates)
-   ▼
-Express Server / Controller
-   │
-   ▼
-QueueService (Orchestrator)
-   │
-   ├───────────────► QueueManager (High & Low Priority Queues)
-   │                     ▲
-   │                     │ (Priority + Aging Selection)
-   │                     ▼
-   ├───────────────► Scheduler
-   │                     │
-   ▼                     ▼
-WorkerManager (Worker Pool Control)
-   │
-   ├─► Worker Thread 1 (csvWorker.ts) ──► CsvProcessor (Stream Sum)
-   ├─► Worker Thread 2 (csvWorker.ts) ──► CsvProcessor (Stream Sum)
-   └─► Worker Thread N (csvWorker.ts) ──► CsvProcessor (Stream Sum)
-   │
-   ▼
-Result Returned ──► Socket.IO Broadcast ──► Real-Time Dashboard Updates
+React Client
+     │
+     │ HTTP + Socket.IO
+     ▼
+Express Server
+     │
+     ▼
+QueueService
+     │
+     ├── QueueManager
+     │      ├── HIGH Queue
+     │      └── LOW Queue
+     │
+     ▼
+Scheduler
+     │
+     ▼
+WorkerManager
+     │
+     ├── Worker Thread 1
+     ├── Worker Thread 2
+     ├── Worker Thread 3
+     └── Worker Thread 4
+     │
+     ▼
+CSV Processor
+     │
+     ▼
+Result + Progress
+     │
+     ▼
+Socket.IO Broadcast
+     │
+     ▼
+All Connected Clients
 ```
 
 ---
 
-## 3. Queue Algorithm & Priority Scheduling
+## ⚙️ Technology Stack
 
-The system employs a two-tier priority queue structure (`HIGH` and `LOW`).
+### Frontend
 
-1. **Queue Organization**:
-   - `HIGH` priority queue: Handled with strict FIFO precedence under normal conditions.
-   - `LOW` priority queue: Serviced when `HIGH` priority queue is empty or when starvation prevention triggers.
+* React
+* JavaScript
+* Vite
+* Socket.IO Client
+* CSS
 
-2. **Selection Logic**:
-   - When a worker becomes available, the `Scheduler` queries the queues.
-   - All waiting low-priority jobs increment their `age` counter by 1 per scheduling cycle.
-   - High-priority jobs are processed ahead of low-priority jobs unless any low-priority job exceeds the **Starvation Threshold** (`MAX_AGE_THRESHOLD = 5`).
+### Backend
 
----
+* Node.js
+* Express.js
+* Socket.IO
+* Multer
+* Worker Threads
+* Node.js Streams
 
-## 4. Starvation Prevention Strategy
+### Processing
 
-To protect low-priority jobs from indefinite waiting (starvation) when a continuous stream of high-priority jobs arrives:
-
-- **Aging Mechanism**: Every scheduling cycle, all waiting jobs in the low-priority queue increment an internal `age` metric.
-- **Deterministic Promotion**: If any low-priority job reaches `age >= 5`, the `Scheduler` temporarily promotes that specific job and dispatches it immediately, regardless of how many high-priority jobs are currently queued.
-- **Reset**: Once dispatched, the job's age is reset to 0.
-
-*Result*: A low-priority job is guaranteed to be serviced within at most 5 high-priority processing cycles.
-
----
-
-## 5. Worker Architecture & Pool Lifecycle
-
-To ensure CPU-intensive CSV calculation (parsing & numerical summation) does not block Node.js's main single-threaded event loop:
-
-- **Worker Threads (`node:worker_threads`)**: Each calculation runs in an isolated OS worker thread.
-- **Worker Pool Control (`WorkerManager`)**:
-  - The maximum concurrent worker thread pool size is capped (`MAX_WORKERS = 4`, configurable based on host CPU core count).
-  - When all worker threads are busy, newly arrived jobs wait in the queue without blocking HTTP or WebSocket handling.
-  - Workers stream CSV files line-by-line using Node streams and post periodic progress messages (`PROGRESS`, 0–100%) back to the parent thread.
-- **Error & Resource Isolation**: If a worker encounters invalid data or crashes, the error is isolated to that specific job. The worker slot is freed, and other queued jobs continue executing smoothly.
+* CSV streaming
+* Integer and floating-point calculations
+* Priority-based scheduling
+* Worker thread pool
 
 ---
 
-## 6. Deadlock Analysis & Prevention
+## 🔄 Queue & Priority Scheduling
 
-### Possible Deadlocks
-1. **Worker Thread Hanging / Infinite Loop**: A corrupt or malformed file causes a worker thread to lock or hang indefinitely, consuming worker pool slots until no free workers remain.
-2. **Circular File Resource Locks**: A job waiting for an open file descriptor held by a worker that is itself waiting for the job state.
-3. **Queue Mutex Contention**: Concurrent API requests causing race conditions in queue array mutations.
+The system uses two priority levels:
 
-### Productivity Impact
-Without deadlock prevention:
-- **Queue Throughput**: Drops to 0 as worker pool slots become exhausted.
-- **User Waiting Time**: Tends to infinity for all subsequent submissions.
-- **Server Resources**: Memory leaks and unreleased file descriptors degrade system stability.
+### HIGH Priority
 
-### Prevention Mechanisms
-1. **Watchdog Worker Timeouts**: `WorkerManager` attaches a 60-second watchdog timer to every active worker. If processing exceeds 60 seconds, the worker thread is forcibly terminated (`worker.terminate()`), the job is marked `FAILED`, and the worker slot is released immediately.
-2. **Non-Blocking Async Event Loop**: Node.js naturally serializes queue state mutations on the main event loop, eliminating traditional multi-threaded OS mutex deadlocks.
-3. **Stream Handle Cleanup**: All file reading streams are wrapped in strict `try...finally` blocks to guarantee file handles close upon completion, error, or worker exit.
+HIGH priority jobs are processed before LOW priority jobs under normal conditions.
+
+### LOW Priority
+
+LOW priority jobs are processed when there are no HIGH priority jobs waiting.
+
+### Starvation Prevention
+
+To prevent LOW priority jobs from waiting indefinitely:
+
+* Waiting jobs maintain an aging counter.
+* The age increases during scheduling cycles.
+* When a LOW priority job reaches the starvation threshold, it is promoted.
+* This guarantees that LOW priority jobs eventually get processed.
 
 ---
 
-## 7. API & Real-Time Events Documentation
+## 🧵 Worker Thread Architecture
 
-### REST Endpoints
+CPU-intensive CSV processing is moved away from the Node.js main event loop.
 
-#### `POST /api/upload`
-Upload a CSV file and submit a processing job.
-- **Body (`multipart/form-data`)**:
-  - `file`: CSV File (required)
-  - `priority`: `'HIGH'` | `'LOW'` (default: `'LOW'`)
-  - `clientId`: User session ID string
-- **Response `201 Created`**:
-```json
-{
-  "message": "File submitted successfully",
-  "job": {
-    "jobId": "JOB-1001",
-    "clientId": "USER-x89f2a",
-    "fileName": "sales-data.csv",
-    "fileSize": 12048,
-    "priority": "HIGH",
-    "status": "QUEUED",
-    "queuePosition": 1,
-    "workerId": null,
-    "progress": 0,
-    "createdAt": "2026-09-01T14:00:00.000Z",
-    "result": null,
-    "error": null
-  }
-}
+A worker pool manages multiple processing jobs concurrently.
+
+```text
+Incoming Job
+     ↓
+Queue
+     ↓
+Scheduler
+     ↓
+WorkerManager
+     ↓
+Worker Thread
+     ↓
+CSV Processing
+     ↓
+Result
 ```
 
-#### `GET /api/queue`
-Fetch full queue state and statistics.
-
-#### `GET /api/job/:jobId`
-Fetch details for a specific job ID.
-
-#### `GET /api/stats`
-Fetch system statistics (`totalJobs`, `processing`, `waiting`, `completed`, `failed`, `activeWorkers`, `maxWorkers`).
-
-### WebSocket Events (Socket.IO)
-- `queue:update` — Emitted whenever any job enters, changes position, or finishes in the queue.
-- `job:progress` — Emitted live as worker threads report chunk processing percentage.
-- `job:completed` — Emitted when a job finishes calculation.
-- `job:failed` — Emitted if a job fails validation or calculation.
+The worker pool prevents large CSV calculations from blocking HTTP requests and WebSocket communication.
 
 ---
 
-## 8. Running Locally
+## 🛡️ Deadlock Prevention
+
+Potential worker deadlocks or hanging jobs are handled using:
+
+### Worker Timeout
+
+Each worker has a maximum processing time.
+
+If a worker exceeds the timeout:
+
+```text
+Worker Timeout
+      ↓
+Worker Terminated
+      ↓
+Job marked FAILED
+      ↓
+Worker slot released
+      ↓
+Next queued job processed
+```
+
+### Non-blocking Event Loop
+
+Queue state is managed through Node.js's event loop, avoiding traditional shared-memory mutex contention.
+
+### Resource Cleanup
+
+CSV streams and worker resources are cleaned up when processing completes or fails.
+
+---
+
+## 🔌 API Endpoints
+
+### Upload CSV
+
+```http
+POST /api/upload
+```
+
+Multipart form data:
+
+```text
+file
+priority
+clientId
+```
+
+Example priority:
+
+```text
+HIGH
+LOW
+```
+
+### Get Queue
+
+```http
+GET /api/queue
+```
+
+Returns the current queue state and job information.
+
+### Get Job
+
+```http
+GET /api/job/:jobId
+```
+
+Returns details for a specific job.
+
+### Get Statistics
+
+```http
+GET /api/stats
+```
+
+Returns queue statistics such as:
+
+* Total jobs
+* Processing jobs
+* Waiting jobs
+* Completed jobs
+* Failed jobs
+* Active workers
+* Maximum workers
+
+---
+
+## 🔔 Socket.IO Events
+
+The application uses Socket.IO for real-time queue updates.
+
+### `queue:update`
+
+Broadcast when queue state changes.
+
+### `job:progress`
+
+Broadcast during CSV processing.
+
+### `job:completed`
+
+Broadcast when processing finishes successfully.
+
+### `job:failed`
+
+Broadcast when a job fails.
+
+---
+
+## 🧪 Testing Scenarios
+
+### Single User
+
+1. Open the application.
+2. Upload a CSV.
+3. Select HIGH priority.
+4. Submit the file.
+5. Verify processing and completion.
+
+### Multiple Users
+
+Open the application in multiple browser windows and upload files simultaneously.
+
+Observe that queue updates are synchronized between clients.
+
+### Priority Testing
+
+1. Upload a LOW priority file.
+2. Upload a HIGH priority file.
+3. Verify that the HIGH priority job is scheduled first when applicable.
+
+### Starvation Prevention
+
+Submit:
+
+```text
+LOW
+HIGH
+HIGH
+HIGH
+HIGH
+HIGH
+```
+
+Verify that the LOW priority job eventually receives processing time instead of waiting indefinitely.
+
+### Error Handling
+
+Upload an invalid/non-numeric CSV and verify that the job is marked as `FAILED` without crashing the server.
+
+---
+
+## 💻 Local Development
 
 ### Prerequisites
-- Node.js 18+ and `npm`
 
-### Installation & Execution
+* Node.js 18+
+* npm
+
+### Clone Repository
 
 ```bash
-# 1. Clone repository
-git clone https://github.com/imravirajj/Binaire_Freznel_Assessment.git
-cd Binaire_Freznel_Assessment
+git clone https://github.com/IshaNITM/MultiUserQueueSystem.git
+cd MultiUserQueueSystem
+```
 
-# 2. Install all dependencies (root, server, client)
-npm run install:all
+### Install Backend
 
-# 3. Start development server (runs backend on :3001 and frontend on :3000)
+```bash
+cd server
+npm install
+```
+
+### Start Backend
+
+```bash
+npm start
+```
+
+### Install Frontend
+
+Open another terminal:
+
+```bash
+cd client
+npm install
+```
+
+### Start Frontend
+
+```bash
 npm run dev
 ```
 
-Open your browser at `http://localhost:3000`.
+The frontend runs on:
+
+```text
+http://localhost:3000
+```
 
 ---
 
-## 9. Testing
+## ☁️ Deployment
 
-### Sample Data Provided
-Sample files are available in the `samples/` directory:
-- `samples/small_integers.csv` — Basic 3x3 matrix (Sum = 21)
-- `samples/floats_and_ints.csv` — Floating point numbers and negative numbers
-- `samples/invalid_data.csv` — Non-numeric data (for error handling testing)
+The project is deployed using separate frontend and backend services.
 
-### Verification Scenarios
-1. **Single User / Single File**: Upload `small_integers.csv` with `HIGH` priority. Verify sum result is `21`.
-2. **Multiple Users**: Open 2 or 3 separate browser windows/tabs (each gets a distinct `User ID`). Upload files simultaneously and observe real-time sync across all windows.
-3. **Priority Ordering**: Upload a `LOW` priority file first, then quickly upload a `HIGH` priority file. Observe `HIGH` priority jump ahead in position.
-4. **Starvation Prevention**: Submit 1 `LOW` priority job followed by 6 `HIGH` priority jobs. Observe the `LOW` priority job promoted after 5 cycles.
-5. **Error Handling**: Upload `invalid_data.csv`. Verify that the job is cleanly flagged as `FAILED` with an descriptive error message without crashing the server.
+### Frontend
+
+Hosted on **Vercel**:
+
+https://multi-user-queue-system-virid.vercel.app/
+
+### Backend
+
+Hosted on **Render**:
+
+https://multiuserqueuesystem.onrender.com
+
+### Environment Variable
+
+The frontend uses:
+
+```text
+VITE_API_URL=https://multiuserqueuesystem.onrender.com
+```
+
+The backend is configured to communicate with the deployed frontend through CORS and Socket.IO.
 
 ---
 
-## 10. Deployment
+## 📁 Project Structure
 
-The application is structured for easy deployment to cloud platforms like Vercel, Railway, Render, or Heroku.
-
-### Single Container Deployment (e.g. Railway / Render / DigitalOcean App Platform)
-1. Build command: `npm run build`
-2. Start command: `npm start` (Runs Node server which also serves the compiled React app from `client/dist`).
+```text
+MultiUserQueueSystem/
+│
+├── client/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── models/
+│   │   ├── services/
+│   │   ├── App.jsx
+│   │   └── main.jsx
+│   └── package.json
+│
+├── server/
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── models/
+│   │   ├── queue/
+│   │   ├── scheduler/
+│   │   ├── server/
+│   │   ├── services/
+│   │   ├── utils/
+│   │   ├── workers/
+│   │   └── index.js
+│   └── package.json
+│
+├── small-integers.csv
+├── floats.csv
+├── mixed-values.csv
+└── README.md
+```
 
 ---
 
-## 11. Design Decisions & Technical Trade-Offs
+## 🔗 Repository
 
-1. **Streaming CSV Reader vs. In-Memory Array**:
-   - *Decision*: Line-by-line `readline` streams with Node.js `fs.createReadStream`.
-   - *Trade-off*: Slightly higher overhead for micro-files, but prevents heap out-of-memory crashes on multi-gigabyte CSV files.
-2. **Aging-Based Starvation Prevention vs. Weighted Round Robin**:
-   - *Decision*: Deterministic aging counter.
-   - *Trade-off*: Simpler to reason about and test, with a hard bound on low-priority wait times.
-3. **Socket.IO over Plain WebSockets**:
-   - *Decision*: Socket.IO for real-time communication.
-   - *Trade-off*: Requires Socket.IO client library overhead, but provides automatic reconnection, room support, and fallback transports.
+GitHub:
+
+https://github.com/IshaNITM/MultiUserQueueSystem
+
+## 📄 Assessment
+
+This project was developed for the **Binaire Multi-User Queue System assessment**.
