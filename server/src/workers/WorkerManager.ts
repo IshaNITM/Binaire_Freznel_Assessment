@@ -66,22 +66,30 @@ export class WorkerManager {
       filePath: job.filePath
     };
 
-    // Determine path to worker script (supports both tsx runtime and compiled js)
-    const ext = __filename.endsWith('.ts') ? '.ts' : '.js';
-    const workerScriptPath = path.join(__dirname, `csvWorker${ext}`);
+    // Always use the compiled JS worker from dist/ to avoid tsx/ts-node issues
+    // in worker_threads. Workers need standard JS, not TypeScript.
+    const distWorkerPath = path.resolve(process.cwd(), 'dist', 'workers', 'csvWorker.js');
+    const colocatedJsPath = path.join(__dirname, 'csvWorker.js');
+
+    let workerScriptPath: string;
+    if (fs.existsSync(distWorkerPath)) {
+      workerScriptPath = distWorkerPath;
+    } else if (fs.existsSync(colocatedJsPath)) {
+      workerScriptPath = colocatedJsPath;
+    } else {
+      const errMsg = `Worker script not found. Run "npm run build" in server/ first. Searched: ${distWorkerPath}, ${colocatedJsPath}`;
+      Logger.error('WorkerManager', errMsg);
+      if (this.onErrorCallback) {
+        this.onErrorCallback(job, errMsg);
+      }
+      return false;
+    }
 
     Logger.info('WorkerManager', `Assigning ${job.jobId} to ${workerId} using script ${workerScriptPath}`);
 
-    const workerOptions: any = { workerData: taskData };
-    
-    // If running under tsx/ts-node, register tsxloader
-    if (ext === '.ts') {
-      workerOptions.execArgv = ['--import', 'tsx'];
-    }
-
     let worker: Worker;
     try {
-      worker = new Worker(workerScriptPath, workerOptions);
+      worker = new Worker(workerScriptPath, { workerData: taskData });
     } catch (err: any) {
       Logger.error('WorkerManager', `Failed to spawn worker for ${job.jobId}: ${err.message}`);
       if (this.onErrorCallback) {
