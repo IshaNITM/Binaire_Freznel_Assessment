@@ -10,8 +10,8 @@ class SocketService {
   connect() {
     if (this.socket) return;
 
-    // Use current host/port or proxy
-    this.socket = io({
+    // Use current host/port or proxy, or provided VITE_API_URL for production
+    this.socket = io(import.meta.env.VITE_API_URL || undefined, {
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,
     });

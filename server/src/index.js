@@ -14,8 +14,8 @@ const PORT = process.env.PORT || 3001;
 const app = express();
 const server = http.createServer(app);
 
-// Enable CORS for frontend dev server
-app.use(cors());
+// Enable CORS for frontend dev server or production frontend
+app.use(cors({ origin: process.env.CLIENT_URL || "*" }));
 app.use(express.json());
 
 // Initialize core QueueService (with 4 worker threads max)
@@ -24,10 +24,13 @@ const queueService = new QueueService(4);
 // Mount API router
 app.use("/api", createUploadRouter(queueService));
 
+// Health check endpoint
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+
 // Initialize Socket.IO
 const io = new SocketIOServer(server, {
   cors: {
-    origin: "*",
+    origin: process.env.CLIENT_URL || "*",
     methods: ["GET", "POST"],
   },
 });
@@ -43,7 +46,7 @@ if (fs.existsSync(clientBuildPath)) {
   });
 }
 
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   Logger.info(
     "Server",
     `🚀 Binaire Queue System Server running on port ${PORT}`,

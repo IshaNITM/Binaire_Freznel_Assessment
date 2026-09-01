@@ -36,7 +36,8 @@ export class ApiService {
         resolve({ success: false, error: "Network error during upload" });
       };
 
-      xhr.open("POST", "/api/upload");
+      const apiUrl = import.meta.env.VITE_API_URL || "";
+      xhr.open("POST", `${apiUrl}/api/upload`);
       xhr.send(formData);
     });
   }
