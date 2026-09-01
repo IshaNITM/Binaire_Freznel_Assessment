@@ -1,11 +1,6 @@
-import React from 'react';
+import React from "react";
 
-interface HeaderProps {
-  clientId: string;
-  isConnected: boolean;
-}
-
-export const Header: React.FC<HeaderProps> = ({ clientId, isConnected }) => {
+export const Header = ({ clientId, isConnected }) => {
   return (
     <header className="app-header">
       <div className="brand-section">
@@ -19,9 +14,11 @@ export const Header: React.FC<HeaderProps> = ({ clientId, isConnected }) => {
       </div>
 
       <div className="connection-indicator">
-        <span className={`status-dot ${isConnected ? 'connected' : 'disconnected'}`} />
-        <span style={{ color: isConnected ? '#34d399' : '#f87171' }}>
-          {isConnected ? 'Connected' : 'Disconnected'}
+        <span
+          className={`status-dot ${isConnected ? "connected" : "disconnected"}`}
+        />
+        <span style={{ color: isConnected ? "#34d399" : "#f87171" }}>
+          {isConnected ? "Connected" : "Disconnected"}
         </span>
       </div>
     </header>

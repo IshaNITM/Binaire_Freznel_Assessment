@@ -1,37 +1,40 @@
-import fs from 'fs';
-import readline from 'readline';
+import fs from "fs";
+import readline from "readline";
 
 export class CsvProcessor {
   /**
    * Validates if a CSV file exists, is non-empty, and contains numeric values.
    */
-  public static async validateCsv(filePath: string): Promise<{ isValid: boolean; error?: string }> {
+  static async validateCsv(filePath) {
     if (!fs.existsSync(filePath)) {
-      return { isValid: false, error: 'File does not exist' };
+      return { isValid: false, error: "File does not exist" };
     }
 
     const stats = fs.statSync(filePath);
     if (stats.size === 0) {
-      return { isValid: false, error: 'File is empty (0 bytes)' };
+      return { isValid: false, error: "File is empty (0 bytes)" };
     }
 
     return new Promise((resolve) => {
-      const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
-      const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+      const stream = fs.createReadStream(filePath, { encoding: "utf8" });
+      const rl = readline.createInterface({
+        input: stream,
+        crlfDelay: Infinity,
+      });
 
       let lineCount = 0;
       let hasValidNumber = false;
-      let validationError: string | null = null;
+      let validationError = null;
 
-      rl.on('line', (line) => {
+      rl.on("line", (line) => {
         lineCount++;
         const trimmed = line.trim();
         if (!trimmed) return; // Skip empty lines
 
-        const parts = trimmed.split(',');
+        const parts = trimmed.split(",");
         for (const part of parts) {
           const val = part.trim();
-          if (val === '') continue;
+          if (val === "") continue;
 
           const num = Number(val);
           if (isNaN(num)) {
@@ -44,17 +47,17 @@ export class CsvProcessor {
         }
       });
 
-      rl.on('close', () => {
+      rl.on("close", () => {
         if (validationError) {
           resolve({ isValid: false, error: validationError });
         } else if (!hasValidNumber) {
-          resolve({ isValid: false, error: 'File contains no numeric values' });
+          resolve({ isValid: false, error: "File contains no numeric values" });
         } else {
           resolve({ isValid: true });
         }
       });
 
-      rl.on('error', (err) => {
+      rl.on("error", (err) => {
         resolve({ isValid: false, error: `Read error: ${err.message}` });
       });
     });
@@ -64,25 +67,28 @@ export class CsvProcessor {
    * Processes a CSV file and calculates the sum of all numeric values.
    * Reports progress via the provided callback.
    */
-  public static async processCsvFile(
-    filePath: string,
-    onProgress?: (percent: number) => void
-  ): Promise<number> {
+  static async processCsvFile(filePath, onProgress) {
     const stats = fs.statSync(filePath);
     const totalBytes = stats.size;
     let bytesRead = 0;
     let totalSum = 0;
 
     return new Promise((resolve, reject) => {
-      const stream = fs.createReadStream(filePath, { encoding: 'utf8' });
-      const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+      const stream = fs.createReadStream(filePath, { encoding: "utf8" });
+      const rl = readline.createInterface({
+        input: stream,
+        crlfDelay: Infinity,
+      });
 
       let lastReportedProgress = -1;
 
-      stream.on('data', (chunk: string | Buffer) => {
+      stream.on("data", (chunk) => {
         bytesRead += Buffer.byteLength(chunk);
         if (onProgress && totalBytes > 0) {
-          const percent = Math.min(99, Math.floor((bytesRead / totalBytes) * 100));
+          const percent = Math.min(
+            99,
+            Math.floor((bytesRead / totalBytes) * 100),
+          );
           if (percent > lastReportedProgress) {
             lastReportedProgress = percent;
             onProgress(percent);
@@ -90,14 +96,14 @@ export class CsvProcessor {
         }
       });
 
-      rl.on('line', (line) => {
+      rl.on("line", (line) => {
         const trimmed = line.trim();
         if (!trimmed) return;
 
-        const parts = trimmed.split(',');
+        const parts = trimmed.split(",");
         for (const part of parts) {
           const val = part.trim();
-          if (val === '') continue;
+          if (val === "") continue;
 
           const num = Number(val);
           if (isNaN(num)) {
@@ -110,7 +116,7 @@ export class CsvProcessor {
         }
       });
 
-      rl.on('close', () => {
+      rl.on("close", () => {
         if (onProgress) {
           onProgress(100);
         }
@@ -119,7 +125,7 @@ export class CsvProcessor {
         resolve(roundedSum);
       });
 
-      rl.on('error', (err) => {
+      rl.on("error", (err) => {
         reject(err);
       });
     });

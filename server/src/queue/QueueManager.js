@@ -1,23 +1,19 @@
-import { QueueJob } from '../models/QueueJob.js';
-import { Priority, JobStatus, QueueStats, IQueueJobJSON } from '../models/types.js';
-import { Scheduler } from '../scheduler/Scheduler.js';
-import { Logger } from '../utils/logger.js';
+import { Priority } from "../models/types.js";
+import { Logger } from "../utils/logger.js";
 
 export class QueueManager {
-  private highQueue: QueueJob[] = [];
-  private lowQueue: QueueJob[] = [];
-  private processingMap: Map<string, QueueJob> = new Map();
-  private completedList: QueueJob[] = [];
-  private failedList: QueueJob[] = [];
-  private allJobsMap: Map<string, QueueJob> = new Map();
+  highQueue = [];
+  lowQueue = [];
+  processingMap = new Map();
+  completedList = [];
+  failedList = [];
+  allJobsMap = new Map();
 
-  private scheduler: Scheduler;
-
-  constructor(scheduler: Scheduler) {
+  constructor(scheduler) {
     this.scheduler = scheduler;
   }
 
-  public enqueueJob(job: QueueJob): void {
+  enqueueJob(job) {
     this.allJobsMap.set(job.jobId, job);
 
     if (job.priority === Priority.HIGH) {
@@ -27,10 +23,13 @@ export class QueueManager {
     }
 
     this.scheduler.updateQueuePositions(this.highQueue, this.lowQueue);
-    Logger.info('QueueManager', `Job ${job.jobId} (${job.priority}) added to queue. High: ${this.highQueue.length}, Low: ${this.lowQueue.length}`);
+    Logger.info(
+      "QueueManager",
+      `Job ${job.jobId} (${job.priority}) added to queue. High: ${this.highQueue.length}, Low: ${this.lowQueue.length}`,
+    );
   }
 
-  public getNextJob(): QueueJob | null {
+  getNextJob() {
     const job = this.scheduler.selectNextJob(this.highQueue, this.lowQueue);
     if (job) {
       this.processingMap.set(job.jobId, job);
@@ -39,44 +38,50 @@ export class QueueManager {
     return job;
   }
 
-  public markJobCompleted(jobId: string, result: number): void {
+  markJobCompleted(jobId, result) {
     const job = this.processingMap.get(jobId);
     if (job) {
       job.setCompleted(result);
       this.processingMap.delete(jobId);
       this.completedList.unshift(job); // Add to head of completed history
       this.scheduler.updateQueuePositions(this.highQueue, this.lowQueue);
-      Logger.info('QueueManager', `Job ${jobId} marked completed with result ${result}`);
+      Logger.info(
+        "QueueManager",
+        `Job ${jobId} marked completed with result ${result}`,
+      );
     }
   }
 
-  public markJobFailed(jobId: string, error: string): void {
+  markJobFailed(jobId, error) {
     const job = this.processingMap.get(jobId);
     if (job) {
       job.setFailed(error);
       this.processingMap.delete(jobId);
       this.failedList.unshift(job);
       this.scheduler.updateQueuePositions(this.highQueue, this.lowQueue);
-      Logger.info('QueueManager', `Job ${jobId} marked failed with error: ${error}`);
+      Logger.info(
+        "QueueManager",
+        `Job ${jobId} marked failed with error: ${error}`,
+      );
     }
   }
 
-  public getJob(jobId: string): QueueJob | undefined {
+  getJob(jobId) {
     return this.allJobsMap.get(jobId);
   }
 
-  public getAllJobs(): IQueueJobJSON[] {
-    const allJobs: QueueJob[] = [
+  getAllJobs() {
+    const allJobs = [
       ...Array.from(this.processingMap.values()),
       ...this.highQueue,
       ...this.lowQueue,
       ...this.completedList,
-      ...this.failedList
+      ...this.failedList,
     ];
-    return allJobs.map(job => job.toJSON());
+    return allJobs.map((job) => job.toJSON());
   }
 
-  public getStats(activeWorkers: number, maxWorkers: number): QueueStats {
+  getStats(activeWorkers, maxWorkers) {
     return {
       totalJobs: this.allJobsMap.size,
       processing: this.processingMap.size,
@@ -84,11 +89,11 @@ export class QueueManager {
       completed: this.completedList.length,
       failed: this.failedList.length,
       activeWorkers,
-      maxWorkers
+      maxWorkers,
     };
   }
 
-  public get waitingCount(): number {
+  get waitingCount() {
     return this.highQueue.length + this.lowQueue.length;
   }
 }

@@ -1,11 +1,6 @@
-import React from 'react';
-import { QueueStats } from '../models/types';
+import React from "react";
 
-interface StatsOverviewProps {
-  stats: QueueStats;
-}
-
-export const StatsOverview: React.FC<StatsOverviewProps> = ({ stats }) => {
+export const StatsOverview = ({ stats }) => {
   return (
     <div className="stats-grid">
       <div className="stat-card total">
