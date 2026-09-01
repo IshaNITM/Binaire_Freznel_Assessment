@@ -128,9 +128,9 @@ export class WorkerManager {
 
       case "SUCCESS":
         this.cleanupWorker(workerId);
-        job.setCompleted(message.result);
+        job.setCompleted(message.result, message.outputFile);
         if (this.onCompleteCallback) {
-          this.onCompleteCallback(job, message.result);
+          this.onCompleteCallback(job, message.result, message.outputFile);
         }
         break;
 

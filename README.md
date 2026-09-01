@@ -154,12 +154,22 @@ The worker pool prevents large CSV calculations from blocking HTTP requests and 
 
 ## 🛡️ Deadlock Prevention
 
-Potential worker deadlocks or hanging jobs are handled using:
+The system is designed to prevent all potential deadlocks in a Node.js asynchronous architecture.
 
-### Worker Timeout
+### 1. Which types of deadlocks are possible?
+- **Worker Thread Deadlock (Infinite Loop):** A malicious or extremely large CSV file could cause a worker thread to enter an infinite loop or take too long, locking up that specific CPU core forever.
+- **Resource Starvation (Livelock):** A constant stream of HIGH priority jobs could completely starve LOW priority jobs, causing them to wait forever.
+- **Queue/State Race Conditions:** If the main event loop was blocked synchronously while waiting for a file stream to finish, it would freeze the entire server and no new Socket.IO connections or uploads could occur.
 
+### 2. How can deadlocks affect user productivity?
+- Users would experience indefinite loading screens (e.g., jobs stuck in "Processing..." or "Waiting" at 0%) with no feedback.
+- The server would eventually stop responding to all clients, bringing productivity across the entire platform to a halt.
+- Users would be unable to retrieve their critical CSV calculations, causing data bottlenecks.
+
+### Deadlock Prevention Mechanisms
+
+**Worker Timeout (Watchdog Timer)**
 Each worker has a maximum processing time.
-
 If a worker exceeds the timeout:
 
 ```text

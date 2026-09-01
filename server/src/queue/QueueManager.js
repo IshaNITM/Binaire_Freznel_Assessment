@@ -38,10 +38,10 @@ export class QueueManager {
     return job;
   }
 
-  markJobCompleted(jobId, result) {
+  markJobCompleted(jobId, result, outputFile) {
     const job = this.processingMap.get(jobId);
     if (job) {
-      job.setCompleted(result);
+      job.setCompleted(result, outputFile);
       this.processingMap.delete(jobId);
       this.completedList.unshift(job); // Add to head of completed history
       this.scheduler.updateQueuePositions(this.highQueue, this.lowQueue);

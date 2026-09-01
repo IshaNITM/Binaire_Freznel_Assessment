@@ -14,10 +14,9 @@ export class QueueService extends EventEmitter {
     this.queueManager = new QueueManager(this.scheduler);
     this.workerManager = new WorkerManager(maxWorkers, 60000);
 
-    // Register worker manager callbacks
     this.workerManager.registerCallbacks(
       (job, progress) => this.handleJobProgress(job, progress),
-      (job, result) => this.handleJobCompletion(job, result),
+      (job, result, outputFile) => this.handleJobCompletion(job, result, outputFile),
       (job, error) => this.handleJobFailure(job, error),
     );
   }
@@ -81,8 +80,8 @@ export class QueueService extends EventEmitter {
     this.emit("job:progress", job.toJSON());
   }
 
-  handleJobCompletion(job, result) {
-    this.queueManager.markJobCompleted(job.jobId, result);
+  handleJobCompletion(job, result, outputFile) {
+    this.queueManager.markJobCompleted(job.jobId, result, outputFile);
     this.emitQueueUpdate();
     this.emit("job:completed", job.toJSON());
     // Trigger next job processing

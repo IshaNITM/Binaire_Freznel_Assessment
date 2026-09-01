@@ -74,7 +74,27 @@ export const JobCard = ({ job, currentClientId }) => {
       </td>
       <td>
         {job.status === JobStatus.COMPLETED && job.result !== null ? (
-          <span className="result-cell">{job.result.toLocaleString()}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'flex-start' }}>
+            <span className="result-cell">{job.result.toLocaleString()}</span>
+            {job.outputFile && isOwnJob && (
+              <a 
+                href={`${import.meta.env.VITE_API_URL || ""}/api/download/${job.jobId}`} 
+                target="_blank"
+                rel="noreferrer"
+                style={{ 
+                  fontSize: 10, 
+                  color: '#818cf8',
+                  textDecoration: 'none',
+                  fontWeight: 'bold',
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  padding: '2px 6px',
+                  borderRadius: '4px'
+                }}
+              >
+                ⬇ Download Output
+              </a>
+            )}
+          </div>
         ) : job.status === JobStatus.FAILED ? (
           <span className="error-cell" title={job.error || "Failed"}>
             ⚠️ {job.error || "Failed"}

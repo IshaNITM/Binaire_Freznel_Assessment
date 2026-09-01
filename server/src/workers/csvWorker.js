@@ -17,7 +17,20 @@ async function executeTask() {
       },
     );
 
-    const successMsg = { type: "SUCCESS", result };
+    // Generate output file
+    const fs = await import("fs");
+    const path = await import("path");
+    
+    const outputDir = path.join(process.cwd(), "outputs");
+    if (!fs.existsSync(outputDir)) {
+      fs.mkdirSync(outputDir, { recursive: true });
+    }
+    
+    const outputFilename = `result-${taskData.jobId}.csv`;
+    const outputPath = path.join(outputDir, outputFilename);
+    fs.writeFileSync(outputPath, `Result\n${result}`);
+
+    const successMsg = { type: "SUCCESS", result, outputFile: outputFilename };
     parentPort.postMessage(successMsg);
   } catch (err) {
     const errorMsg = {

@@ -107,5 +107,25 @@ export function createUploadRouter(queueService) {
     res.json(queueService.getStats());
   });
 
+  /**
+   * GET /api/download/:jobId
+   */
+  router.get("/download/:jobId", (req, res) => {
+    const { jobId } = req.params;
+    const job = queueService.getJobStatus(jobId);
+    if (!job || !job.outputFile) {
+      res.status(404).json({ error: "File not found" });
+      return;
+    }
+    
+    const filePath = path.join(process.cwd(), "outputs", job.outputFile);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: "File not found on disk" });
+      return;
+    }
+    
+    res.download(filePath, job.outputFile);
+  });
+
   return router;
 }

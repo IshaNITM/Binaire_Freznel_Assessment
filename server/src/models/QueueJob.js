@@ -18,6 +18,7 @@ export class QueueJob {
     this._completedAt = null;
     this._result = null;
     this._error = null;
+    this._outputFile = null;
     this._age = 0;
   }
 
@@ -49,6 +50,9 @@ export class QueueJob {
   get error() {
     return this._error;
   }
+  get outputFile() {
+    return this._outputFile;
+  }
   get age() {
     return this._age;
   }
@@ -73,10 +77,11 @@ export class QueueJob {
     this._progress = Math.min(100, Math.max(0, Math.round(progress)));
   }
 
-  setCompleted(result) {
+  setCompleted(result, outputFile) {
     this._status = JobStatus.COMPLETED;
     this._progress = 100;
     this._result = result;
+    this._outputFile = outputFile || null;
     this._completedAt = new Date();
     this._queuePosition = 0;
   }
@@ -111,6 +116,7 @@ export class QueueJob {
       startedAt: this._startedAt ? this._startedAt.toISOString() : null,
       completedAt: this._completedAt ? this._completedAt.toISOString() : null,
       result: this._result,
+      outputFile: this._outputFile,
       error: this._error,
       age: this._age,
     };
